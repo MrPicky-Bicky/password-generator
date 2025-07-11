@@ -502,8 +502,7 @@
         const baseSymbolChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 
         // --- Логика Gemini API ---
-        const apiKey = ""; // API-ключ будет предоставлен средой выполнения
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const apiUrl = 'https://gemini-api-proxy.bertayvehen.workers.dev';
 
         async function callGemini(prompt) {
             const payload = {
