@@ -395,6 +395,66 @@
         #explanation-content {
             white-space: pre-wrap; /* Сохраняет форматирование ответа Gemini */
         }
+        
+        /* --- НОВЫЙ БЛОК: История паролей --- */
+        .history-container {
+            margin-top: 2rem;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .history-header h4 {
+            color: var(--text-secondary-color);
+            font-weight: normal;
+        }
+        #clear-history-button {
+            background: none;
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+            border-radius: 5px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #clear-history-button:hover {
+            background-color: rgba(247, 118, 142, 0.1);
+        }
+        #history-list {
+            list-style: none;
+            max-height: 150px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        #history-list li {
+            background-color: var(--surface-color);
+            padding: 0.75rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Roboto Mono', monospace;
+            word-break: break-all;
+            transition: background-color 0.2s;
+        }
+        #history-list li:hover {
+            background-color: #31364a;
+        }
+        .history-placeholder {
+            color: var(--text-secondary-color);
+            font-style: italic;
+            text-align: center;
+            cursor: default !important;
+        }
+        .history-placeholder:hover {
+             background-color: var(--surface-color) !important;
+        }
     </style>
 </head>
 <body>
@@ -484,6 +544,16 @@
                 <span>✨ Создать фразу-пароль</span>
             </button>
         </div>
+
+        <div class="history-container">
+            <div class="history-header">
+                <h4>История генерации:</h4>
+                <button id="clear-history-button" title="Очистить историю">Очистить</button>
+            </div>
+            <ul id="history-list">
+                <li class="history-placeholder">Здесь будут ваши последние пароли...</li>
+            </ul>
+        </div>
     </div>
 
     <div class="modal-overlay" id="explanation-modal">
@@ -515,19 +585,24 @@
         const copyFeedback = document.getElementById('copy-feedback');
         const strengthBars = document.querySelectorAll('.strength-bar');
         const strengthText = document.getElementById('strength-text');
-        const crackTimeValue = document.getElementById('crack-time-value'); // <-- Новый элемент
+        const crackTimeValue = document.getElementById('crack-time-value');
         const passwordSpinner = document.getElementById('password-spinner');
         const explanationSpinner = document.getElementById('explanation-spinner');
         const explainStrengthButton = document.getElementById('explain-strength-button');
         const explanationModal = document.getElementById('explanation-modal');
         const modalCloseButton = document.getElementById('modal-close-button');
         const explanationContent = document.getElementById('explanation-content');
+        // Новые элементы для истории
+        const historyList = document.getElementById('history-list');
+        const clearHistoryButton = document.getElementById('clear-history-button');
 
-        // --- Наборы символов ---
+        // --- Наборы символов и переменные ---
         const baseUppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
         const baseLowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
         const baseNumberChars = '0123456789';
         const baseSymbolChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+        let passwordHistory = []; // Массив для хранения истории
+        const MAX_HISTORY_SIZE = 5;
 
         // --- Логика Gemini API ---
         const apiUrl = 'https://gemini-api-proxy.bertayevhen.workers.dev/';
@@ -573,7 +648,8 @@
             const passphrase = await callGemini(prompt);
             passwordDisplay.textContent = passphrase;
             passwordSpinner.style.display = 'none';
-            updatePasswordStrength(); // Оценить новый пароль
+            updatePasswordStrength();
+            addPasswordToHistory(passphrase); // Добавляем в историю
         }
         
         async function handleExplainStrength() {
@@ -647,6 +723,7 @@
             password = password.split('').sort(() => 0.5 - Math.random()).join('');
             passwordDisplay.textContent = password;
             updatePasswordStrength();
+            addPasswordToHistory(password); // Добавляем в историю
         }
 
         // --- Функция копирования пароля ---
@@ -665,7 +742,7 @@
             });
         }
         
-        // --- НОВАЯ ФУНКЦИЯ: Форматирование времени ---
+        // --- Функция: Форматирование времени ---
         function formatTime(seconds) {
             if (seconds < 1) return "мгновенно";
             if (seconds < 60) return `${Math.ceil(seconds)} сек`;
@@ -698,7 +775,7 @@
         }
 
 
-        // --- ОБНОВЛЕННАЯ Функция обновления индикатора надежности ---
+        // --- Функция обновления индикатора надежности ---
         function updatePasswordStrength() {
             const password = passwordDisplay.textContent;
             
@@ -743,6 +820,57 @@
             }
         }
 
+        // --- НОВЫЕ ФУНКЦИИ ДЛЯ ИСТОРИИ ---
+        function addPasswordToHistory(password) {
+            if (!password || password.includes('Выберите') || passwordHistory.includes(password)) {
+                return;
+            }
+            // Добавляем пароль в начало
+            passwordHistory.unshift(password);
+            // Ограничиваем размер истории
+            if (passwordHistory.length > MAX_HISTORY_SIZE) {
+                passwordHistory.length = MAX_HISTORY_SIZE;
+            }
+            saveHistory();
+            updateHistoryUI();
+        }
+
+        function updateHistoryUI() {
+            historyList.innerHTML = ''; // Очищаем список
+            if (passwordHistory.length === 0) {
+                historyList.innerHTML = '<li class="history-placeholder">Здесь будут ваши последние пароли...</li>';
+                return;
+            }
+
+            passwordHistory.forEach(pwd => {
+                const li = document.createElement('li');
+                li.textContent = pwd;
+                li.addEventListener('click', () => {
+                    passwordDisplay.textContent = pwd;
+                    updatePasswordStrength();
+                });
+                historyList.appendChild(li);
+            });
+        }
+
+        function saveHistory() {
+            localStorage.setItem('passwordHistory', JSON.stringify(passwordHistory));
+        }
+
+        function loadHistory() {
+            const savedHistory = localStorage.getItem('passwordHistory');
+            if (savedHistory) {
+                passwordHistory = JSON.parse(savedHistory);
+                updateHistoryUI();
+            }
+        }
+        
+        function clearHistory() {
+            passwordHistory = [];
+            saveHistory();
+            updateHistoryUI();
+        }
+
         // --- Слушатели событий ---
         lengthSlider.addEventListener('input', (e) => {
             lengthValue.textContent = e.target.value;
@@ -763,9 +891,13 @@
                 explanationModal.classList.remove('visible');
             }
         });
+        clearHistoryButton.addEventListener('click', clearHistory);
         
         // --- Инициализация при загрузке страницы ---
-        window.addEventListener('load', generatePassword);
+        window.addEventListener('load', () => {
+            loadHistory();
+            generatePassword();
+        });
     </script>
 
 </body>
